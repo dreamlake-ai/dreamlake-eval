@@ -19,6 +19,7 @@ def pytest_addoption(parser):
     group.addoption("--eval-attempt-id", help="Unique attempt identity within the job")
     group.addoption("--eval-attempt-number", type=int, default=1, help="Explicit increasing attempt number; never wall-clock ordering")
     group.addoption("--eval-source", help="Optional JSON provider/source provenance; never executes a workflow")
+    group.addoption("--eval-workflow", help="Explicit validated workflow.json snapshot; never raw YAML")
     group.addoption("--eval-context", default="{}", help="Explicit JSON attributes, e.g. machine/dataset/seed")
     group.addoption("--eval-resume-from", help="Prior eval.json; workload must explicitly restore its checkpoint")
     group.addoption("--eval-prior-stopped", action="store_true", help="Caller has reconciled prior execution as stopped")
@@ -51,7 +52,14 @@ def pytest_configure(config):
             text(source.get("provider"))
         except (ValueError, TypeError):
             raise pytest.UsageError("--eval-source requires a JSON object with provider") from None
-    config.pluginmanager.register(Adapter(config, context, source), "dreamlake-eval-recorder")
+    workflow = None
+    if config.getoption("eval_workflow"):
+        try:
+            from .workflow import read_workflow
+            workflow = read_workflow(config.getoption("eval_workflow"))
+        except (ValueError, OSError) as exc:
+            raise pytest.UsageError(str(exc)) from None
+    config.pluginmanager.register(Adapter(config, context, source, workflow), "dreamlake-eval-recorder")
 
 
 def _parameter(value):
@@ -63,8 +71,9 @@ def _parameter(value):
 
 
 class Adapter:
-    def __init__(self, config, context, source):
+    def __init__(self, config, context, source, workflow):
         self.config, self.context, self.source = config, context, source
+        self.workflow = workflow
         self.items, self.errors = [], []
         self.recorder = None
         self.interrupted = False
@@ -97,6 +106,8 @@ class Adapter:
                                 "observations": deepcopy(self.errors)}}
         if self.source is not None:
             suite["source"] = deepcopy(self.source)
+        if self.workflow is not None:
+            suite["workflow"] = deepcopy(self.workflow)
         path = self.config.getoption("eval_discovery")
         if path:
             atomic_write(Path(path), suite)

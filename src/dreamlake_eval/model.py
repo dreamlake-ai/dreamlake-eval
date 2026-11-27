@@ -85,6 +85,9 @@ def validate_suite(suite: dict) -> dict:
         if not isinstance(suite["source"], dict):
             raise ValueError("source must be a provider provenance object")
         text(suite["source"].get("provider"))
+    if "workflow" in suite:
+        from .workflow import validate_workflow
+        suite["workflow"] = validate_workflow(suite["workflow"])
     ids = set()
     for trial in suite["trials"]:
         if not isinstance(trial, dict) or text(trial.get("id")) in ids:
@@ -100,7 +103,10 @@ def validate_suite(suite: dict) -> dict:
 def definition_hash(suite: dict) -> str:
     # Selection can change on a deliberate retry; identities/parameter metadata cannot.
     inventory = [{k: v for k, v in trial.items() if k != "selection"} for trial in suite["trials"]]
-    return hashlib.sha256(encoded({"suiteId": suite["suiteId"], "source": suite.get("source"), "trials": sorted(inventory, key=lambda r: r["id"])})).hexdigest()
+    identity = {"suiteId": suite["suiteId"], "source": suite.get("source"), "trials": sorted(inventory, key=lambda r: r["id"])}
+    if "workflow" in suite:
+        identity["workflow"] = suite["workflow"]
+    return hashlib.sha256(encoded(identity)).hexdigest()
 
 
 def validate_report(report: dict) -> dict:
@@ -140,6 +146,8 @@ def read_report(path: str | Path) -> dict:
 
 def validate_progress(previous: dict, current: dict) -> None:
     """Reject regressions within one attempt; retry belongs to another identity."""
+    if previous["definitionHash"] != current["definitionHash"]:
+        raise ValueError("run definition cannot change within an attempt")
     if previous["execution"] != "running":
         if {k: v for k, v in previous.items() if k != "sequence"} != {k: v for k, v in current.items() if k != "sequence"}:
             raise ValueError("terminal run outcome cannot change")
@@ -271,6 +279,13 @@ class Recorder:
                                 "metrics": {}, "attributes": {}, "phases": {}, "checkpoints": [],
                                 "artifacts": [], "graph": {"nodes": [], "edges": []}}
         self._commit("run.created", snapshot=deepcopy(self._data))
+        if "workflow" in suite:
+            # Journal is committed first; replay retains the authoritative copy.
+            try:
+                atomic_write(self.output / "workflow.json", suite["workflow"])
+            except BaseException:
+                self._failed = True
+                raise
 
     def _commit(self, event_type: str, **payload: Any) -> None:
         if self._failed:
