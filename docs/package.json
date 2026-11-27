@@ -5,10 +5,10 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3018",
+    "dev": "vite",
     "build": "vite build && node scripts/gen-llms.mjs && pagefind --site dist/client",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview --host 0.0.0.0 --port 3018",
+    "preview": "vite preview",
     "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
