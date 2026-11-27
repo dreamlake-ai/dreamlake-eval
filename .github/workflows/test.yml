@@ -1,0 +1,38 @@
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main, publish-production]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: '3.11'
+            pytest: 'pytest==8.4.2'
+          - python: '3.13'
+            pytest: 'pytest>=9,<10'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv --python '${{ matrix.python }}'
+      - run: uv pip install -e '.[dev,pytest]' '${{ matrix.pytest }}'
+      - run: .venv/bin/python -m pytest -q
+      - run: .venv/bin/python examples/multi_job/run.py --output /tmp/evaluation-example
+      - run: uv build
+      - name: Verify isolated core wheel without pytest or SDK
+        run: |
+          uv venv /tmp/core-wheel
+          uv pip install --python /tmp/core-wheel/bin/python dist/*.whl
+          /tmp/core-wheel/bin/python -c 'import importlib.util; import dreamlake_eval; assert importlib.util.find_spec("pytest") is None; assert importlib.util.find_spec("dreamlake") is None; assert dreamlake_eval.__version__ == "0.1.0"'
+  validation:
+    name: package validation
+    if: always()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - run: test '${{ needs.test.result }}' = success

@@ -1,0 +1,33 @@
+[project]
+name = "dreamlake-eval"
+version = "0.1.0"
+description = "Pytest discovery and explicit evaluation reports for long-running trials"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "DreamLake"}]
+dependencies = []
+
+[project.optional-dependencies]
+pytest = ["pytest>=8.4,<10"]
+dev = ["pytest>=8.4,<10", "build>=1.2", "pytest-asyncio>=1,<2"]
+
+[project.scripts]
+dreamlake-eval = "dreamlake_eval.cli:main"
+
+[project.entry-points.pytest11]
+dreamlake_eval = "dreamlake_eval.pytest_plugin"
+
+[project.urls]
+Homepage = "https://eval.dreamlake.ai"
+Repository = "https://github.com/dreamlake-ai/dreamlake-eval"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dreamlake_eval"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
