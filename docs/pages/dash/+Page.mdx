@@ -46,3 +46,52 @@ This explicit local writer needs no server or account. In a pytest test, use `ev
 Connect to Dash deliberately using its configured endpoint and authorization. Keep local evaluation files usable when remote recording is not requested. Do not infer upload, indexing or public sharing from an artifact URI.
 
 The standalone client API and release examples are maintained in the [Dash package source](https://github.com/fortyfive-labs/dreamlake/tree/main/packages/dreamlake-dash). The [recording guide](https://py.dreamlake.ai/native-experiments) documents native connections and authentication. The evaluation adapter does not change the existing job-control API.
+
+## Open a trial's actual Dash run
+
+The existing `dreamlake-eval` 0.1.1 API can record this association. No new recorder API or automatic Dash upload is needed:
+
+```python
+def test_quality(eval_trial, actual_dash_run_url):
+    # The application or fixture supplies a URL copied from a real Dash run.
+    eval_trial.artifact(actual_dash_run_url, name="Dash run")
+    eval_trial.metric("accuracy", 0.95)
+    assert 0.95 >= 0.9
+```
+
+`actual_dash_run_url` is a caller-provided fixture, not a built-in fixture. Open the intended existing run in DreamLake Dash and copy its canonical run address. The route is `https://dreamlake.ai/NAMESPACE/dash/PROJECT/RUN`; those uppercase values are placeholders, not a published destination. Remove any optional view-selection query or fragment. Use the exact run identity for this trial and attempt. A Source folder, pytest node ID, run name or local Dash prefix does not establish that identity.
+
+The current standalone Dash client does not expose a public canonical run-page URL property. Its remote recording banner may use the older project page with a run query; follow it, open the actual run in Dash, and copy the canonical Dash run address. Do not depend on the client's private `_view_url` or `_experiment_id` fields. Local-only `Experiment` output has no hosted destination unless it has separately been recorded or imported into a real run.
+
+The leaf-to-Dash UI integration uses an explicit absolute URL on `https://dreamlake.ai` with exactly the namespace, `dash`, project and run path segments, without credentials, query or fragment. The name **Dash run** is a useful label, not a magic API discriminator. Exactly one distinct valid target is required; multiple different run URLs are ambiguous. Without a unique recorded destination, the UI keeps the recorded results available and labels the missing Dash association. Historical reports are not automatically linked. Recording support is available in 0.1.1; navigation is a separately deployed client capability, so recording a reference alone does not guarantee that an older UI exposes a link. The destination still performs normal access checks; recording a URI neither grants access nor proves the run exists.
+
+## Async tests and explicit per-test mappings
+
+Use the same method inside an async test. `pytest-asyncio` continues to own its loop and async fixtures:
+
+```python
+import asyncio
+import pytest
+
+@pytest.mark.asyncio
+async def test_async_quality(eval_trial, actual_dash_run_url):
+    await asyncio.sleep(0)
+    eval_trial.artifact(actual_dash_run_url, name="Dash run")
+    eval_trial.metric("reward", 2)
+```
+
+For a reusable fixture and multiple test files, the [CPU/async example](https://github.com/dreamlake-ai/dreamlake-eval/tree/main/examples/multi_job) accepts an explicit JSON map via its example-only `--dash-links` option. Map exact pytest node IDs from discovery to copied canonical run URLs. Omit tests with no real destination; an empty `{}` records no links. The example's `conftest.py` records each selected test's reference in its own attempt and validates the URL shape without contacting the destination.
+
+```sh
+python examples/multi_job/run.py \
+  --output /tmp/new-linked-evaluation \
+  --dash-links /absolute/path/to/your-dash-links.json
+```
+
+`--dash-links` belongs to this example's pytest configuration, not to the `dreamlake-eval` core CLI. The example starts no remote runs, allocates no workers, discovers no Dash accounts and uploads nothing. The default example remains entirely local and has no fabricated destinations.
+
+## Association survives aggregation and retries explicitly
+
+The original reference is retained in `eval.json` at `trials[].attempt.artifacts` and in the event journal. Replay preserves it. Multi-job aggregation retains the chosen attempt's references at `aggregate.json` → `rows[].attempt.artifacts`, alongside its job and trial identity. Test names repeated across jobs stay separate.
+
+A newer attempt does not inherit an old attempt's URL. Record the new attempt's actual destination explicitly, even if intentionally reusing the same existing Dash run. Missing jobs, omitted mappings and unreported retries remain unlinked. The legacy `cict.json` heatmap projection does not carry these artifact associations; navigation should read the canonical report, not infer links from the heatmap or a `.dreamrc` Source prefix.

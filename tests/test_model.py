@@ -205,3 +205,19 @@ def test_invalid_manifest_and_attributes_rejected_before_write(tmp_path):
     with pytest.raises(ValueError): trial.phase("setup", "passed", duration=-1)
     with pytest.raises(ValueError): recorder.finish(exit_code=True)
     assert recorder.snapshot() == before
+
+
+def test_explicit_dash_artifact_survives_replay_aggregate_without_retry_inheritance(tmp_path):
+    # Synthetic URI for serialization only: no remote run or network request.
+    uri = "https://dreamlake.ai/example/dash/project/synthetic-run"
+    inventory = suite()
+    original = Recorder(inventory, tmp_path / "first", run_id="evaluation", attempt_id="a1")
+    trial = original.trial(inventory["trials"][0]["id"])
+    trial.start(); trial.artifact(uri, name="Dash run"); trial.complete("completed", "passed"); original.finish()
+    recovered = replay(tmp_path / "first/events.jsonl")
+    plan = manifest("evaluation", {"local": inventory})
+    result = merge_reports(plan, [recovered])
+    assert result["rows"][0]["attempt"]["artifacts"] == [{"uri": uri, "name": "Dash run", "attributes": {}}]
+    retry = Recorder(inventory, tmp_path / "retry", run_id="evaluation", attempt_id="a2", attempt_number=2)
+    latest = merge_reports(plan, [retry.snapshot(), recovered])
+    assert not latest["complete"] and latest["rows"][0]["attempt"]["artifacts"] == []
