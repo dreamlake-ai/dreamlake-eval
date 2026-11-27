@@ -34,7 +34,7 @@ The development server uses port 3018. Run `pnpm typecheck` and `pnpm build` bef
 
 ## Publish
 
-Merge the reviewed source with the package's normal checks intact. An authorized operator runs `pnpm deploy` from `docs/` using the existing Vault-backed Netlify credentials. The script builds from a clean committed revision, deploys the existing Terraform-owned site and records the source revision in `/release.json`.
+Merge the reviewed source with the package's normal checks intact. An authorized operator runs `pnpm run deploy` from `docs/` using the existing Vault-backed Netlify credentials. The script builds from a clean committed revision, deploys the existing Terraform-owned site and records the source revision in `/release.json`.
 
 Hosting, DNS and publisher settings belong to the `python/packages` Terraform root in DreamLake Infrastructure. Editing a page does not require creating another site or changing infrastructure.
 
