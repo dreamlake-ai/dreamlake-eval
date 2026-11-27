@@ -1,0 +1,32 @@
+---
+title: DreamLake Eval
+section: Start
+order: 0
+---
+
+# DreamLake Eval
+
+Evaluate work that spans functions, machines and time. Keep the expected inventory, each execution attempt, raw measurements and the resulting verdict together.
+
+Pytest is the first execution adapter. Its discovery, fixtures, parametrization and assertions remain useful building blocks. The evaluation model also needs to describe results from multiple jobs, including jobs that have not reported yet.
+
+## Start with a real test
+
+[Collect and run a pytest suite](/quickstart), then [show its results in DreamLake](/platform). [Async tests](/async) work alongside pytest-asyncio. [Aggregate metrics from several test files and jobs](/aggregation) into `.dreamrc` heatmaps. [Understand long-running evaluations](/long-running) before adding checkpoints or retries. [Reports and evidence](/reports) explains the portable files and heatmap projection.
+
+| Layer | Responsibility |
+| --- | --- |
+| Evaluation inventory | What was expected, with stable trial and job identity |
+| Attempt | What executed, what it observed and how it ended |
+| Raw measurements | Metrics, artifacts and checkpoint references |
+| Verdict | Assertions or an explicit rule applied to measurements |
+| Aggregate report | Coverage and results across the expected jobs |
+| Dash | Recording and retrieving metrics and artifacts |
+
+## Current scope and direction
+
+The initial package provides a local recorder and a pytest adapter. It does not allocate runners or turn checkpoint references into resumable processes. The [lifecycle page](/long-running) separates current guarantees from proposed recovery and scheduling behavior.
+
+Threshold editing and exploratory comparisons belong in DreamLake's interface. Basic test status remains available without a browser or threshold editor. A verdict that gates CI must be reproducible headlessly from the same saved, versioned rule.
+
+The [design notes](/design) are the public working area for this evolving model. Their proposal labels are intentional: a design note is not a claim that a capability has shipped.

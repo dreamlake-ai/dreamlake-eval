@@ -1,0 +1,117 @@
+---
+title: Long-running model
+section: Start
+order: 2
+---
+
+# Long-running model
+
+A long test is still an execution attempt. Duration alone does not make it resumable, distributed or safe to retry.
+
+## Keep identity explicit
+
+A trial identifies the intended evaluation case. An attempt identifies one execution of that case. A run or evaluation identity groups related attempts; a job or shard identifies one contributor to a larger report.
+
+Record measurements while an attempt is running instead of waiting for the final status. Preserve a checkpoint reference when the application has actually written a checkpoint. The checkpoint's restore semantics belong to that application until a runner contract explicitly defines them.
+
+| Behavior | Initial boundary |
+| --- | --- |
+| Test discovery | Pytest collection, including parametrized node IDs |
+| Basic status | Pytest setup, call and teardown outcomes |
+| Metrics and evidence | Explicit observations and references |
+| Event ordering | Order within one recorder/output stream |
+| Process kill | May leave an unfinished attempt; never infer success |
+| Checkpoint reference | Evidence that a caller reported a location |
+| Resume lineage | Implemented with a fresh attempt and explicit prior-stopped confirmation |
+| Automatic workload restoration | Not provided; restore the checkpoint in your workload |
+| Automatic retry or machine allocation | Outside the initial recorder |
+| Many workers writing one file | Unsupported without a coordination contract |
+
+## Parallel execution
+
+Separate jobs can run concurrently and produce separate reports. The aggregate needs the expected inventory to know whether all contributors arrived. Passing results from two of three expected shards do not establish a passing evaluation.
+
+Within pytest, execution and fixture behavior belong to pytest and the selected plugins. Do not assume that an arbitrary parallel plugin can safely share the same output directory. Use isolated outputs and merge only through an explicit compatible aggregation contract.
+
+## Failure and recovery questions
+
+A durable distributed runner must decide who owns an attempt, how leases expire, how duplicate events are deduplicated, and which retry contributes to the final verdict. It must distinguish cancellation from loss of contact, and retain failed attempts for analysis. These are [design questions](/design/aggregate-reports), not guarantees implied by a JSON report.
+
+
+## Generic recorder without pytest
+
+This complete local example creates a real checkpoint and report artifact, records them, and finishes one trial. Run it in a new working directory:
+
+```python
+from pathlib import Path
+from dreamlake_eval import Recorder, SCHEMA_VERSION
+
+suite = {
+    "schemaVersion": SCHEMA_VERSION,
+    "kind": "suite",
+    "suiteId": "training",
+    "collection": {"complete": True, "observations": []},
+    "trials": [{"id": "train/seed-0", "nodeId": "train/seed-0",
+                "caseId": "train", "selection": "selected", "context": {"seed": 0}}],
+}
+recorder = Recorder(suite, "out/attempt-1", run_id="training-example",
+                    job_id="train", attempt_id="train-1", attempt_number=1)
+trial = recorder.trial("train/seed-0")
+trial.start()
+checkpoint = Path("checkpoint.json").resolve()
+checkpoint.write_text('{"step": 100, "score": 0.9}')
+artifact = Path("summary.txt").resolve()
+artifact.write_text("Training reached step 100")
+trial.metric("quality", 0.9, step=100)
+trial.checkpoint(checkpoint.as_uri(), name="step-100")
+trial.artifact(artifact.as_uri(), name="summary")
+trial.complete("completed", "passed", reason="quality_at_least_0.8")
+recorder.finish()
+```
+
+The files stay local; a `file:` reference is not remotely readable just because it appears in the report. Upload or declare artifacts explicitly when moving the report to another machine or Source.
+
+## A fresh retry or resumed attempt
+
+After the prior execution has stopped, reuse the same suite, evaluation and job identity with a new attempt ID, higher attempt number and new output directory:
+
+```python
+retry = Recorder(suite, "out/attempt-2", run_id="training-example",
+                 job_id="train", attempt_id="train-2", attempt_number=2,
+                 resume_from="out/attempt-1/eval.json", prior_stopped=True)
+trial = retry.trial("train/seed-0")
+print(trial.resume_checkpoints)
+trial.start()
+# Your workload reads the selected checkpoint and restores model/optimizer state here.
+trial.metric("quality", 0.95, step=101)
+trial.complete("completed", "passed", reason="quality_at_least_0.8")
+retry.finish()
+```
+
+The new attempt starts with fresh trial status and measurements. It retains lineage and exposes prior checkpoint references through `resume_checkpoints`; it does not copy old success into unfinished work. `prior_stopped=True` is a caller assertion, not remote termination or lease enforcement.
+
+For pytest, the equivalent command after reconciling the prior worker is:
+
+```sh
+pytest tests/ --eval-output out/pytest-2 --eval-run-id regression \
+  --eval-job-id unit --eval-attempt-id unit-2 --eval-attempt-number 2 \
+  --eval-resume-from out/attempt-1/eval.json --eval-prior-stopped
+```
+
+Here `out/attempt-1/eval.json` must be the prior pytest report with the same suite and identities, such as the [platform example](/platform), not the generic training report above. Within the test, inspect `eval_trial.resume_checkpoints` and implement restoration yourself.
+
+## Recover after a stopped writer
+
+If a writer was killed, first establish that it can no longer append to its journal. Reconstruct the last durable facts without executing tests:
+
+```sh
+dreamlake-eval replay out/attempt-1/events.jsonl --output recovered.json
+```
+
+A partially written final line is rejected by default. After inspecting that condition, opt into discarding only the truncated tail:
+
+```sh
+dreamlake-eval replay out/attempt-1/events.jsonl --output recovered.json --allow-truncated-tail
+```
+
+Use the recovered report as `resume_from` for a new attempt only after reconciling the old execution. Replay does not turn an unfinished trial into a pass, repair a conflicting sequence, resume the old writer or restore application state. Preserve the original journal for diagnosis.

@@ -1,0 +1,41 @@
+---
+title: Write and publish design notes
+section: Design notes
+order: 8
+---
+
+# Write and publish design notes
+
+Documentation lives beside the package under `docs/pages/`. Each page is an MDX file named `+Page.mdx`; the directory supplies its route. The site uses the shared DreamLake DocKit shell.
+
+## Edit a page
+
+Use the page's **Edit this page** link to open its source on GitHub. For a new note, create `docs/pages/design/your-topic/+Page.mdx` with frontmatter:
+
+```yaml
+---
+title: Your topic
+section: Design notes
+order: 20
+---
+```
+
+Start the body with a status such as **Proposal**, **Accepted design**, or **Implemented in version X**. Include the concrete problem, current behavior, alternatives, decision and remaining questions. Link executable examples or implementation when making a guarantee.
+
+## Preview locally
+
+```bash
+cd docs
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+The development server uses port 3018. Run `pnpm typecheck` and `pnpm build` before submitting the change. The build produces static pages, search data, Markdown counterparts and `/llms.txt`; all come from the same MDX sources.
+
+## Publish
+
+Merge the reviewed source with the package's normal checks intact. An authorized operator runs `pnpm deploy` from `docs/` using the existing Vault-backed Netlify credentials. The script builds from a clean committed revision, deploys the existing Terraform-owned site and records the source revision in `/release.json`.
+
+Hosting, DNS and publisher settings belong to the `python/packages` Terraform root in DreamLake Infrastructure. Editing a page does not require creating another site or changing infrastructure.
+
+Private account details, tokens, conversation transcripts and operational release receipts do not belong in public docs. Write technical notes specifically for this site.

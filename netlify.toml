@@ -1,0 +1,15 @@
+[build]
+  base = "docs"
+  command = "pnpm build"
+  publish = "dist/client"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/release.json"
+  [headers.values]
+    Cache-Control = "no-cache"

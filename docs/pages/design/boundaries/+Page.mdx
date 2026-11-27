@@ -1,0 +1,43 @@
+---
+title: Product and adapter boundaries
+section: Design notes
+order: 7
+---
+
+# Product and adapter boundaries
+
+**Status: working design.** Pytest is the first adapter; DreamLake Eval is broader than a pytest plugin.
+
+## CI, CT and execution
+
+The product surface formerly called CI/CT is now named **Evaluations**. Historically, CT meant continuous testing. CI connects changes to build and integration workflows. Continuous testing runs tests or evaluations repeatedly, whether triggered by a commit, a schedule, a new dataset or another event.
+
+A useful proposed split is:
+
+| Capability | Responsibility |
+| --- | --- |
+| CI workflow | Trigger, build and integration sequence |
+| Execution resources | Machines, placement and scheduling |
+| Eval | Test/benchmark inventory, attempts and reports across jobs |
+| Dash | Metric and artifact recording |
+| DreamLake Firehose | Deployment, promotion, health checks and rollback |
+
+These capabilities can appear in one connected product without becoming one Python package. DreamLake Firehose is the accepted name for the deployment capability; it is a design boundary here, not a newly released package or infrastructure. Fleet remains a proposed execution-resource boundary.
+
+## Why reuse pytest
+
+Pytest already provides collection, fixtures, parametrization and assertion reporting. The adapter should preserve those behaviors and collect their outcomes, while the core model remains usable by other execution systems.
+
+## The MLflow comparison
+
+The referenced [MLflow classic evaluation API](https://mlflow.org/docs/latest/ml/evaluation/) accepts models, Python functions or precomputed predictions and returns metrics, artifacts and tables. It separates threshold validation from evaluation. That separation is useful here: preserve measurements and evidence, then apply an explicit verdict policy.
+
+This is an architectural comparison, not a compatibility claim. DreamLake Eval does not depend on MLflow or promise its built-in classification, regression or SHAP features. The linked page describes MLflow's classic evaluation system, distinct from its GenAI scorer API.
+
+## Workflow formats
+
+**Accepted architecture; adapter unification is proposed.** DreamLake workflows are independent of their source format. GitHub Actions is one supported external format: its YAML stays in GitHub, and Evaluations reads the top-level definition at the recorded run commit. DreamLake retains runner configuration, run observations and evidence.
+
+Native DreamLake workflows already have a versioned WorkflowSpec v1 with stages, nodes and edges. Their source is retained in DreamLake. Reuse that model rather than inventing another graph schema. The [native workflow guide](https://docs.dreamlake.ai/workflows) documents the existing API and runtime boundary; sampler and control-flow condition/switch/loop/foreach execution must not be assumed supported.
+
+A future unified view can consume native and GitHub providers while preserving their source and execution semantics. The current Evaluations rename does not migrate YAML, replace the native workflow API, or implement every proposed adapter.

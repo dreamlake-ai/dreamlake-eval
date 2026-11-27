@@ -1,0 +1,48 @@
+---
+title: Metrics and artifacts with Dash
+section: Reports
+order: 4
+---
+
+# Metrics and artifacts with Dash
+
+`dreamlake-dash` is the recording client. DreamLake Eval describes evaluation inventory, attempts and verdicts. Keeping these responsibilities separate lets evaluations use stored measurements without making the storage client a test runner.
+
+The standalone Dash distribution is extracted from the existing DreamLake SDK. Existing SDK import paths remain compatibility surfaces; the standalone package should not require the whole SDK merely to record metrics.
+
+## Record facts, then evaluate them
+
+An evaluation can produce a latency series, a final quality score and an artifact containing examples. Store those observations with stable run and attempt identity. A later report can compare them against a threshold policy without rerunning the expensive workload.
+
+| Information | Meaning |
+| --- | --- |
+| Metric name, value and step | A measured observation |
+| Artifact reference | A location for an explicit output |
+| Checkpoint reference | A caller-reported recovery artifact |
+| Trial/attempt identity | Which execution produced the observation |
+| Verdict and policy identity | How those observations were judged |
+
+Measurements are not automatically verdicts. A successfully recorded metric does not prove the test passed, and an upload failure does not change a measured value into zero.
+
+## Local recording example
+
+```sh
+pip install dreamlake-dash
+```
+
+```python
+from dreamlake_dash import Experiment
+
+with Experiment(prefix="team/research/smoke", root="./runs").run as run:
+    run.params.set(seed=0, learning_rate=0.001)
+    run.metrics("train").log(step=0, loss=0.25)
+    run.files("reports").save_json({"passed": True}, to="summary.json")
+```
+
+This explicit local writer needs no server or account. In a pytest test, use `eval_trial.metric` for the evaluation report and Dash when you also want its recording/storage features. There is no automatic mirrored upload between the two recorders.
+
+## Explicit remote recording
+
+Connect to Dash deliberately using its configured endpoint and authorization. Keep local evaluation files usable when remote recording is not requested. Do not infer upload, indexing or public sharing from an artifact URI.
+
+The standalone client API and release examples are maintained in the [Dash package source](https://github.com/fortyfive-labs/dreamlake/tree/main/packages/dreamlake-dash). The [recording guide](https://py.dreamlake.ai/native-experiments) documents native connections and authentication. The evaluation adapter does not change the existing job-control API.
