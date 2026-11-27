@@ -22,13 +22,11 @@ const GIT_HASH = (() => {
 // level of `plugins` — nested one array deeper it sometimes injects a
 // duplicate Vike plugin and the prerender crashes nondeterministically.
 export default defineConfig({
+  server: { host: "0.0.0.0", port: 3018 },
+  preview: { host: "0.0.0.0", port: 3018 },
   define: {
     __APP_VERSION__: JSON.stringify(APP_VERSION),
     __GIT_HASH__: JSON.stringify(GIT_HASH),
   },
   plugins: [...dockit()],
-  server: {
-    port: 3010,
-    strictPort: false,
-  },
 })
