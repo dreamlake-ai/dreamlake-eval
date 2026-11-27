@@ -1,0 +1,64 @@
+---
+title: Async tests and long-running jobs
+section: Start
+order: 3
+---
+
+# Async tests and long-running jobs
+
+DreamLake Eval works alongside pytest's async plugins. `pytest-asyncio` owns the event loop, async fixtures and coroutine execution. DreamLake Eval observes the same setup, call and teardown reports and adds explicit measurements. It does not replace the async runner.
+
+## A complete async test
+
+Install the adapter and async support:
+
+```sh
+pip install 'dreamlake-eval[pytest]' 'pytest-asyncio>=1,<2'
+```
+
+Save this as `tests/test_async.py`:
+
+```python
+import asyncio
+import pytest
+import pytest_asyncio
+
+@pytest_asyncio.fixture
+async def sample():
+    await asyncio.sleep(0)
+    yield 2
+    await asyncio.sleep(0)
+
+@pytest.mark.asyncio
+async def test_async_trial(sample, eval_trial):
+    await asyncio.sleep(0)
+    eval_trial.metric("reward", sample, step=0)
+    assert sample == 2
+```
+
+Run it with a fresh output directory:
+
+```sh
+pytest tests/test_async.py --eval-output out/async-1 \
+  --eval-run-id async-example --eval-job-id async \
+  --eval-attempt-id async-1 --eval-attempt-number 1
+```
+
+Fixture teardown still matters: a passing assertion followed by a teardown error is recorded as an execution error with an inconclusive verdict. The adapter waits for teardown before considering the trial final. An async function without the appropriate async runner is not made runnable by the evaluation plugin.
+
+## Concurrent operations inside one test
+
+A test can await `asyncio.gather` and report a measurement after its child operations finish. Keep one recorder writer per job. Separate independent test jobs into separate pytest invocations and output directories, then aggregate their reports. The current adapter rejects pytest-xdist workers; it does not offer shared multi-process journal writes.
+
+## Submitting a job is different from completing it
+
+If an async test only submits remote training and returns, pytest proves that submission succeeded. It does not prove the remote training or evaluation passed. To report the remote result, await or poll its completion inside the test, inspect its result, record measurements and assert the desired condition. Alternatively, let the remote worker use the generic recorder and contribute its own named job report to the expected manifest.
+
+A checkpoint records an explicit reference:
+
+```python
+# Inside an active test, after the workload has saved this checkpoint:
+eval_trial.checkpoint("s3://my-bucket/run-17/checkpoint-100", name="step-100")
+```
+
+The recorder does not upload the checkpoint, allocate a machine, poll a scheduler or restore a model. Cancellation, remote reconciliation and checkpoint restoration belong to the workload. See [long-running execution](/long-running) for retry and recovery boundaries.

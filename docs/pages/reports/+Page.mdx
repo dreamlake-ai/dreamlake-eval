@@ -1,0 +1,45 @@
+---
+title: Reports and evidence
+section: Reports
+order: 3
+---
+
+# Reports and evidence
+
+The evaluation report is the source of truth for evaluation semantics. A heatmap is a projection of that report.
+
+## Portable report files
+
+| File | Purpose |
+| --- | --- |
+| `suite.json` | Inventory collected before execution |
+| `eval.json` | Current evaluation state, attempts and measurements |
+| `events.jsonl` | Ordered recorder events, one JSON object per line |
+| `cict.json` | Compatibility projection for DreamLake Evaluations and Source visualizations |
+
+Keep trial identity stable across attempts. Keep attempt identity distinct so that retries do not overwrite history. Preserve unvisited or unexecuted cases rather than dropping them from the inventory. Numeric zero is a measurement, not a missing value.
+
+## Heatmap configuration
+
+The compatibility projection uses the existing `dreamlake.cict/v1` evidence schema. A `.dreamrc` can select the compatible `cict` dataset and activity heatmap:
+
+```yaml
+version: 1
+dataset:
+  format: cict
+  file: cict.json
+views:
+  - view: activityHeatmap
+    records: [records]
+    title: Evaluation coverage
+    row: { field: kind }
+    column: { field: id }
+```
+
+The renderer can organize rows and columns by attributes and use configurable color maps. Missing cells, `not_run`, skipped and failed records have different meanings. A failed or incomplete aggregate must not be hidden by averaging its visible green cells.
+
+See the [VizKit activity heatmap](https://viz.dreamlake.ai/components/activity-heatmap) for presentation options and the [Evaluations guide](https://docs.dreamlake.ai/lakeshore/cict) for attaching evidence. No terminal output is automatically indexed by the recorder.
+
+## Aggregate reports are explicit
+
+An aggregate report needs expected contributors and a completeness rule. It cannot infer completeness from the set of files that happened to arrive. See [reports across jobs](/design/aggregate-reports) for the implemented manifest and attempt selection, and the proposed threshold policy boundary.

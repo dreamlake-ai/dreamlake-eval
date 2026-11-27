@@ -1,0 +1,81 @@
+---
+title: Show pytest results in DreamLake
+section: Start
+order: 4
+---
+
+# Show pytest results in DreamLake
+
+Existing pytest tests need no fixture changes to produce inventory and status reports. Add `eval_trial` only when a test should record numeric measurements or explicit artifact references.
+
+## Export ordinary tests
+
+```sh
+pip install 'dreamlake-eval[pytest]'
+dreamlake-eval discover --output suite.json -- tests/
+pytest tests/ --eval-output out/attempt-1 \
+  --eval-run-id regression --eval-job-id unit \
+  --eval-attempt-id unit-1 --eval-attempt-number 1
+```
+
+The new directory contains `eval.json`, `events.jsonl` and the `cict.json` visualization projection. Discovery imports test modules and runs collection hooks; it does not execute test bodies. Preserve the same test selection, suite identity and context between discovery and execution when using a manifest.
+
+Create `out/attempt-1/.dreamrc` beside `cict.json`:
+
+```yaml
+version: 1
+dataset:
+  format: cict
+  file: cict.json
+views:
+  - view: activityHeatmap
+    records: [records]
+    title: Pytest results
+    row: { field: kind }
+    column: { field: testId }
+```
+
+## Open the exported files
+
+Upload or copy the directory into a DreamLake Source you can access, retaining `.dreamrc` and `cict.json` together. Open that folder in Source to render the activity heatmap. The per-test records come from the pytest adapter; GitHub job success alone is not evidence that each individual test passed.
+
+For an already configured DreamLake GitHub runner, declare the directory as run evidence after pytest, including when it fails:
+
+```yaml
+- name: Run tests
+  run: |
+    python -m pip install 'dreamlake-eval[pytest]'
+    pytest tests/ --eval-output outputs/attempt-1 \
+      --eval-run-id "${{ github.run_id }}" --eval-job-id unit \
+      --eval-attempt-id "unit-${{ github.run_attempt }}" \
+      --eval-attempt-number "${{ github.run_attempt }}"
+- name: Configure the result view
+  if: always()
+  run: |
+    mkdir -p outputs/attempt-1
+    cat > outputs/attempt-1/.dreamrc <<'YAML'
+    version: 1
+    dataset:
+      format: cict
+      file: cict.json
+    views:
+      - view: activityHeatmap
+        records: [records]
+        title: Pytest results
+        row: { field: kind }
+        column: { field: testId }
+    YAML
+- name: Save evaluation evidence
+  if: always()
+  uses: dreamlake-ai/cict-evidence@v1
+  with:
+    path: outputs/attempt-1
+```
+
+The configuration step writes `.dreamrc` beside the generated projection, and the evidence step publishes that directory as the evidence root. Runner setup, repository binding and the evidence Source must already be configured. See the [runner and evidence guide](https://docs.dreamlake.ai/lakeshore/cict). A generic GitHub-hosted runner does not gain a DreamLake evidence destination merely by installing this Python package.
+
+In Evaluations, open the workflow run, choose its job and inspect the declared evidence. Source renders a folder's `.dreamrc`; the details panel also preserves GitHub jobs/steps and their logs. The complete `eval.json` retains richer semantics than the compatibility visualization. Automatic aggregate discovery in the details panel is a separate integration, not a guarantee made by the Python recorder.
+
+## Identity and privacy
+
+Use the same evaluation ID across related jobs and a distinct job ID for each contributor. Each retry needs a new attempt ID, increasing attempt number and fresh output directory. Only explicit measurements and references are recorded. The recorder does not automatically ingest terminal output, credentials or every file in the working directory.

@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "@dreamlake/dockit/styles.css";
+
+/* Tell Tailwind where this site's own utility-class usage lives (the
+   library's dist is covered by the @source inside its styles.css). */
+@source "../pages";
+@source "../renderer";

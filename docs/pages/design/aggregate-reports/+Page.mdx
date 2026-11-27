@@ -1,0 +1,44 @@
+---
+title: Reports across jobs
+section: Design notes
+order: 6
+---
+
+# Reports across jobs
+
+**Status: implemented manifest and deterministic reducer, with policy work proposed.** The [aggregation guide](/aggregation) provides executable commands. This note records the semantic boundary and remaining decisions.
+
+A report may combine many jobs. The parent evaluation must know what it expects before it can claim completeness.
+
+## Declared manifest
+
+The implemented manifest identifies the evaluation, explicit jobs and each collected suite with its definition hash. Reports name the evaluation, job, attempt ID, attempt number and sequence. The reducer validates these identities before accepting results.
+
+```text
+evaluation
+  expected: [train, benchmark-cpu, benchmark-gpu]
+  received: [train, benchmark-cpu]
+  coverage: incomplete
+  aggregate verdict: unavailable
+```
+
+The two received jobs may both pass. The evaluation is still incomplete. Missing, skipped, cancelled, errored and failed are distinct states.
+
+## Retry and duplication
+
+A retry creates another attempt. The current rule selects the highest explicit attempt number, then highest sequence; file arrival order does not decide the winner. Duplicate report delivery must be idempotent. Conflicting content for the same attempt identity must fail visibly.
+
+## Thresholds and basic status
+
+Pytest assertions provide basic test status. DreamLake's interface owns threshold editing and exploratory comparisons of saved raw measurements. A policy may compare a mean, quantile or failure fraction across jobs, but the report must retain the individual observations and the sample coverage that produced it.
+
+If a threshold gates CI, use the same versioned policy in a headless evaluation. Record the policy identity, input report identities and aggregation method. A browser-only judgment is insufficient for a reproducible CI gate.
+
+## Open decisions
+
+- Which stricter policies should reject skips or expected failures despite complete execution?
+- How are partial metrics, sample weights and statistical uncertainty represented?
+- What marks a contributor lost, rather than merely slow?
+- Which rule schema should the UI author and the headless evaluator share?
+
+These questions do not require a new scheduler in the initial package. They do require reports that preserve identity and raw evidence.

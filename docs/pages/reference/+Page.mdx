@@ -1,0 +1,72 @@
+---
+title: API and report reference
+section: Reports
+order: 2
+---
+
+# API and report reference
+
+The distribution is `dreamlake-eval`; the Python import is `dreamlake_eval`. The core has no pytest dependency. Install the `pytest` extra for collection and execution integration. The current schema identifier is `dreamlake.eval/v1`.
+
+## Pytest options
+
+| Option | Meaning |
+| --- | --- |
+| `--eval-output DIR` | Fresh directory for this attempt; existing output is rejected |
+| `--eval-run-id ID` | Evaluation identity shared by related jobs; required for recording |
+| `--eval-job-id ID` | Contributor identity; defaults to `local` |
+| `--eval-attempt-id ID` | Unique attempt identity; required for recording |
+| `--eval-attempt-number N` | Positive ordering number; defaults to 1 |
+| `--eval-suite-id ID` | Suite identity; defaults to `pytest` |
+| `--eval-context JSON` | Explicit finite JSON object of attributes |
+| `--eval-discovery FILE` | Inventory output; requires `--collect-only` |
+| `--eval-resume-from FILE` | Prior report used to establish a new attempt's lineage |
+| `--eval-prior-stopped` | Caller assertion that prior execution was reconciled as stopped |
+
+The CLI `discover` command provides a convenient collection wrapper. Its `--context` must match execution's `--eval-context` for the same inventory. Optional source provenance identifies a provider without requiring GitHub. A resumed attempt records lineage and prior checkpoints; your workload must explicitly restore its state. The recorder does not verify remote process termination on your behalf.
+
+## Trial fixture
+
+`eval_trial` is available during a recorded pytest test. Calling it without recording options raises a usage error.
+
+| Method | Purpose |
+| --- | --- |
+| `metric(name, value, step=None, attributes=None)` | Record a finite numeric observation; booleans and NaN are rejected |
+| `artifact(uri, name=None, attributes=None)` | Record an explicit artifact reference |
+| `checkpoint(uri, name=None, attributes=None)` | Record an explicit saved checkpoint reference |
+| `verdict(value, reason=None, policy=None)` | Record a verdict and optional rule identity |
+| `node(id, kind="step", attributes=None)` | Declare a runtime step or decision node |
+| `edge(id, source, target)` | Declare a directed runtime edge |
+| `select(decision, edge_id)` | Record a decision's chosen edge |
+| `step(node_id, execution)` | Update a declared step's execution state |
+
+Optional arguments above are keyword arguments. A runtime graph is an observation of your evaluation's decisions; it is not a replacement workflow execution engine. Do not confuse these report nodes with DreamLake's versioned native WorkflowSpec.
+
+## Outcomes are separate dimensions
+
+Execution states include `not_run`, `running`, `completed`, `error`, `interrupted`, `cancelled`, `timed_out` and `unknown`. Verdicts are `not_evaluated`, `passed`, `failed` and `inconclusive`. Selection separately records `selected` or `deselected`.
+
+| Pytest observation | Recorded interpretation |
+| --- | --- |
+| Passing call and successful teardown | Completed, passed unless an explicit verdict says otherwise |
+| Failed assertion/test call | Completed, failed |
+| Setup or teardown error | Error, inconclusive |
+| Skip | Completed, not evaluated, with skipped reason |
+| Expected failure | Completed, inconclusive, with xfailed reason |
+| Non-strict unexpected pass | Completed, passed, with xpassed reason |
+| Strict unexpected pass | Completed, failed |
+| Interrupted or unfinished execution | Preserved as incomplete; never inferred successful |
+
+The compatibility `cict.json` projection compresses some distinctions. Consult `eval.json` or `aggregate.json` when the exact execution/verdict/availability dimension matters.
+
+## Core exports
+
+`Recorder` provides the same local journal without pytest. Construct it with a validated suite, fresh output path, run ID, job ID, attempt ID and attempt number. Obtain a trial with `recorder.trial(node_id)`, start it, record explicit observations, complete it, then finish the recorder. The caller owns execution and error handling.
+
+`read_report(path)` reads and validates a snapshot. `replay(path)` reconstructs facts from an event journal; it never runs tests. `export_cict(report)` produces the lossy visualization projection. `manifest(evaluation_id, jobs)` declares expected job suites; `merge_reports(plan, reports)` reduces validated snapshots; `write_aggregate(plan, paths, output, metrics=[...])` writes an aggregate and metric views. See the [executable aggregation example](/aggregation).
+
+## Files and durability
+
+The recorder is single-writer. Events have an increasing local sequence; snapshots are written atomically. A killed process can leave an incomplete report or truncated journal tail. Replay rejects a truncated tail unless explicitly requested with `dreamlake-eval replay events.jsonl --output recovered.json --allow-truncated-tail`; discarding that tail does not manufacture the missing event or a completion verdict.
+
+Each aggregate JSON file is atomic, but the collection of view files is not a multi-file transaction. Publish a finished output directory as an artifact snapshot when readers require a consistent view. Uploads, remote leases, distributed cancellation and scheduling are outside this local file contract.

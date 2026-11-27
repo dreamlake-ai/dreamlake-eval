@@ -1,0 +1,53 @@
+---
+title: Pytest quickstart
+section: Start
+order: 1
+---
+
+# Pytest quickstart
+
+Use pytest to discover tests, resolve fixtures, expand parametrization and execute assertions. DreamLake Eval records the inventory and results around that execution.
+
+## Install
+
+```bash
+python -m pip install 'dreamlake-eval[pytest]'
+```
+
+## Define a small suite
+
+Create `tests/test_quality.py`:
+
+```python
+import pytest
+
+@pytest.mark.parametrize("score", [0.8, 0.9], ids=["baseline", "candidate"])
+def test_quality(score, eval_trial):
+    eval_trial.metric("quality", score, step=0)
+    assert score >= 0.75
+```
+
+Pytest node IDs preserve the two parametrized cases as separate trials. A metric value is an observation; the assertion is the basic pass/fail rule.
+
+## Discover before execution
+
+```bash
+dreamlake-eval discover --output suite.json -- tests/
+```
+
+Collection does not run test bodies, but it imports modules and executes collection hooks. Do not use collection as a sandbox for untrusted code. Collection errors must remain visible; they are not an empty successful suite.
+
+## Run and inspect
+
+```bash
+pytest --eval-output out --eval-run-id regression \
+  --eval-job-id unit --eval-attempt-id attempt-1 --eval-attempt-number 1 tests/
+```
+
+Read `out/eval.json` for the evaluation report, `out/events.jsonl` for ordered events, and `out/cict.json` for the Evaluations visualization projection. The command keeps pytest's exit status. Normal skipped tests and expected failures retain their meanings; setup and teardown failures must not disappear behind a successful test body.
+
+Use a fresh output directory and explicit attempt identity for a new execution. The [report model](/reports) explains how attempt identity differs from a trial's stable node ID.
+
+## Add local evidence deliberately
+
+Use the `eval_trial` fixture to record numeric metrics and explicit artifact or checkpoint references. References identify caller-owned data; recording one does not upload a file or restore a process. See [Dash recording](/dash) for the recording client boundary.

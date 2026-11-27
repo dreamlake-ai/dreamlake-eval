@@ -1,0 +1,99 @@
+---
+title: Aggregate metrics across test files and jobs
+section: Reports
+order: 1
+---
+
+# Aggregate metrics across test files and jobs
+
+Declare the expected inventory before collecting results. The aggregator retains every expected test and job, including missing contributors. It combines reports deterministically; it does not silently average measurements or treat missing jobs as successful.
+
+## Run the complete CPU example
+
+The repository includes a synchronous parametrized test file and an async test file, assigned to two named jobs. This local example uses no GPU or paid allocation:
+
+```sh
+git clone https://github.com/dreamlake-ai/dreamlake-eval.git
+cd dreamlake-eval
+python -m venv .venv
+. .venv/bin/activate
+pip install -e '.[pytest]' 'pytest-asyncio>=1,<2'
+python examples/multi_job/run.py --output /tmp/eval-example-new
+```
+
+Use a new output path each time. The script collects both files first, writes the manifest, executes each named job, then produces `aggregate/aggregate.json`, a root `.dreamrc` with all metric views, and metric-specific view directories. It reports three trials across two jobs. Execution is sequential in this demonstration; the same named jobs can run independently in separate processes or machines, provided their report files are explicitly gathered before aggregation.
+
+## The CLI steps
+
+From `examples/multi_job`, using the same working directory and selection for discovery and execution:
+
+```sh
+dreamlake-eval discover --output accuracy-suite.json --suite-id example -- test_accuracy.py
+dreamlake-eval discover --output async-suite.json --suite-id example -- test_async.py
+dreamlake-eval manifest --evaluation-id cpu-example \
+  --job accuracy=accuracy-suite.json --job async=async-suite.json \
+  --output manifest.json
+pytest test_accuracy.py --eval-suite-id example --eval-output out/accuracy-1 \
+  --eval-run-id cpu-example --eval-job-id accuracy --eval-attempt-id accuracy-1
+pytest test_async.py --eval-suite-id example --eval-output out/async-1 \
+  --eval-run-id cpu-example --eval-job-id async --eval-attempt-id async-1
+dreamlake-eval aggregate --manifest manifest.json \
+  --report out/accuracy-1/eval.json --report out/async-1/eval.json \
+  --output aggregate --metric reward --metric durationSeconds
+```
+
+A workflow should preserve failing test reports and run its collection/aggregation step with an explicit always-run policy. Missing files should not be passed as if they existed: supply the reports that arrived, while keeping the complete expected manifest. `complete: false` distinguishes partial coverage from a completed evaluation; inspect individual verdicts separately. Completeness is not a pass verdict.
+
+## Python API
+
+```python
+import json
+from pathlib import Path
+from dreamlake_eval import manifest, write_aggregate
+
+plan = manifest("cpu-example", {
+    "accuracy": json.loads(Path("accuracy-suite.json").read_text()),
+    "async": json.loads(Path("async-suite.json").read_text()),
+})
+result = write_aggregate(
+    plan,
+    ["out/accuracy-1/eval.json", "out/async-1/eval.json"],
+    "aggregate",
+    metrics=["reward", "durationSeconds"],
+)
+print(result["complete"], result["views"])
+```
+
+`manifest` sorts explicit job IDs. `merge_reports` is the pure reducer; `write_aggregate` also writes files. Each view entry names its metric and a safe hashed directory. Read that mapping instead of guessing a directory from a metric name.
+
+## Metric heatmaps
+
+The aggregate root `.dreamrc` references every generated metric view. Publish the entire aggregate directory as one evidence root to keep those relative references valid. Each metric subdirectory also contains its own `.dreamrc` and `cict.json`, so it can be opened independently in Source. The projection retains job and test identity and places the selected measurement at `metrics.value`. You can customize its view:
+
+```yaml
+version: 1
+dataset:
+  format: cict
+  file: cict.json
+views:
+  - view: activityHeatmap
+    records: [records]
+    title: Reward by job and test
+    row: { field: attributes.jobId }
+    column: { field: testId }
+    value: metrics.value
+    status: status
+    colorMap:
+      colors: ['#eff6ff', '#93c5fd', '#2563eb', '#1e3a8a']
+      domain: [0, 1]
+```
+
+Choose a meaningful domain for each metric: a reward range is different from seconds. Attribute paths can organize rows or columns by an explicitly recorded context instead. Color settings are presentation, not a verdict policy. Runtime popover handlers are host application callbacks; `.dreamrc` is data and does not embed executable JavaScript.
+
+Zero remains a measured value. A test that did not report a metric has no `metrics.value`; it is not assigned zero. Missing jobs remain represented by expected rows. The full aggregate retains availability and attempt semantics even where the compatibility grid compresses them.
+
+## Retries, conflicts and thresholds
+
+For each job, the highest explicit attempt number wins, including an unfinished retry. Within that attempt, the highest sequence wins. Repeating identical snapshots is harmless; conflicting snapshots with the same identity are rejected. An older pass does not fill missing results in a newer attempt. Unexpected jobs, changed inventories and mixed evaluation IDs are rejected.
+
+The aggregate retains raw latest measurements per trial. Statistical reductions, cross-job threshold policies and historical trend comparisons require an explicit policy; this first reducer does not invent one. Pytest assertions provide basic test status. A front end may explore thresholds over stored measurements, but a CI-enforced aggregate verdict needs the same versioned rule evaluated outside the browser. See [report semantics](/design/aggregate-reports).
