@@ -122,7 +122,7 @@ def write_aggregate(plan: dict, report_paths: list, output, *, metrics: list[str
                 "selection": row["selection"], "attempt": attempt}]})["records"][0]
         else:
             projection = {"id": row["id"], "testId": row["nodeId"], "name": row["nodeId"],
-                          "kind": "test", "status": "not_run", "metrics": {}, "attributes": {}}
+                          "kind": "test", "status": "unknown", "metrics": {}, "attributes": {}}
         projection["attributes"].update(jobId=row["jobId"], availability=row["availability"],
                                         context=deepcopy(row["context"]))
         records.append(projection)

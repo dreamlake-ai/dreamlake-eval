@@ -157,6 +157,7 @@ def test_per_metric_files_preserve_zero_and_missing(tmp_path):
         assert path.parent == output
         data = json.loads((path / "cict.json").read_text())
         assert data["records"][1]["metrics"] == {}
+        assert data["records"][1]["status"] == "unknown"
         if view["metric"] == "reward.with/slashes":
             assert data["records"][0]["metrics"] == {"value": 0}
         else:
