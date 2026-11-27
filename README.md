@@ -40,6 +40,10 @@ The aggregate retains every expected trial. `complete` describes reporting cover
 
 Provider provenance is optional: `--source '{"provider":"dreamlake","specVersion":"v1"}'` during discovery and the matching `--eval-source` during execution. GitHub repository/ref/run identifiers can be explicit source attributes for that adapter. Inventory and evaluation reports are not executable workflow definitions; native DreamLake WorkflowSpec and GitHub Actions YAML remain owned by their respective orchestration systems.
 
+## Workflow definition snapshots
+
+Version 0.1.1 adds opt-in `dreamlake-eval workflow SOURCE --format yaml --provider github --revision SHA --path .github/workflows/evaluation.yml --output workflow.json`. Install the `workflow` extra for YAML-origin snapshots; native JSON snapshots remain dependency-free. Discovery accepts `--workflow workflow.json`; pytest accepts `--eval-workflow workflow.json`. Source text and parsed JSON are validated against each other before recording, retained for inspection, and bound to the inventory hash. This does not execute workflows or derive a pytest test tree from job commands. See [the complete contract](https://eval.dreamlake.ai/workflows).
+
 ## Release process
 
 Required `package validation` checks run on supported Python/pytest versions. Reviewed exact commits merge to `main`, then the same validated commit is pushed explicitly to protected `publish-production`. The non-cancelling publish workflow builds retained immutable artifacts and refuses an already published version. Initial PyPI bootstrap uses a time-limited token in the branch-restricted `production-publish` environment; this is not a trusted-publisher/OIDC setup. No local or duplicate upload bypass is used.

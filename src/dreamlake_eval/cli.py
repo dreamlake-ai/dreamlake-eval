@@ -17,6 +17,7 @@ def main(argv=None):
     discover.add_argument("--output", required=True)
     discover.add_argument("--suite-id", default="pytest")
     discover.add_argument("--source", help="Optional JSON provider/source provenance")
+    discover.add_argument("--workflow", help="Explicit JSON workflow snapshot")
     discover.add_argument("--context", default="{}")
     discover.add_argument("pytest_args", nargs=argparse.REMAINDER)
     recover = commands.add_parser("replay", help="Rebuild report facts from a journal; never execute tests")
@@ -32,7 +33,23 @@ def main(argv=None):
     merge.add_argument("--report", action="append", default=[])
     merge.add_argument("--output", required=True)
     merge.add_argument("--metric", action="append", default=[])
+    capture = commands.add_parser("workflow", help="Capture explicit workflow source as validated JSON, never execute")
+    capture.add_argument("source")
+    capture.add_argument("--format", choices=["json", "yaml"], required=True)
+    capture.add_argument("--provider", required=True)
+    capture.add_argument("--revision", required=True)
+    capture.add_argument("--path", required=True, help="Authored repository path for provenance")
+    capture.add_argument("--output", required=True)
     args = parser.parse_args(argv)
+    if args.command == "workflow":
+        from .workflow import workflow_snapshot, write_workflow
+        try:
+            snapshot = workflow_snapshot(Path(args.source).read_bytes().decode("utf-8"),
+                                         format=args.format, provider=args.provider, revision=args.revision, path=args.path)
+            write_workflow(args.output, snapshot)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+        return 0
     if args.command == "manifest":
         jobs = {}
         for entry in args.job:
@@ -49,6 +66,8 @@ def main(argv=None):
         if importlib.util.find_spec("pytest") is None:
             parser.error("install dreamlake-eval[pytest] to use pytest discovery")
         rest = args.pytest_args[1:] if args.pytest_args[:1] == ["--"] else args.pytest_args
+        if args.workflow:
+            rest = ["--eval-workflow", str(Path(args.workflow).resolve()), *rest]
         if args.source:
             rest = ["--eval-source", args.source, *rest]
         # The installed pytest11 entry point loads our adapter exactly once.

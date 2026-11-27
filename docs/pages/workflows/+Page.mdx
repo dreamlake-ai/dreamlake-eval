@@ -1,0 +1,80 @@
+---
+title: Inspect recorded workflow definitions
+section: Reports
+order: 3
+---
+
+# Inspect recorded workflow definitions
+
+From `dreamlake-eval` 0.1.1, an evaluation can carry an explicit, validated JSON snapshot of its authored workflow. GitHub Actions YAML remains an authoring format; DreamLake's native WorkflowSpec remains its own versioned JSON definition. This feature records either as JSON for inspection. It does not submit, translate or execute workflows.
+
+A workflow describes jobs and commands. Pytest discovery describes actual collected tests; an evaluation report describes their observed execution, measurements and runtime decisions. A heading such as **Model quality** in the synthetic MNIST design study is an illustrative group, not proof of a workflow job or collected test. Real interfaces must use explicit recorded definitions and associations.
+
+## Capture an explicit file
+
+Install the YAML adapter when recording or validating YAML-origin snapshots:
+
+```sh
+pip install 'dreamlake-eval[pytest,workflow]==0.1.1'
+dreamlake-eval workflow .github/workflows/evaluation.yml \
+  --format yaml --provider github \
+  --revision YOUR_CHECKED_OUT_COMMIT_SHA \
+  --path .github/workflows/evaluation.yml \
+  --output workflow.json
+```
+
+Replace the revision with the commit that supplied the file, not a moving branch label. Inside a checkout, obtain it with `git rev-parse HEAD`. The caller supplies this provenance; the recorder does not contact GitHub or verify that a commit exists. It never automatically reads workflow files, environment variables, logs or terminal output. Choose the exact explicit file to publish; authored text is retained verbatim, including any literals it contains.
+
+For a native DreamLake WorkflowSpec, pass `--format json --provider dreamlake` and its source revision/path. The snapshot validates JSON representation and source consistency, not provider execution semantics. The existing native WorkflowSpec validator and GitHub Actions remain responsible for their respective workflow schemas. Unsupported native runtime features do not become executable through capture.
+
+## Bind discovery and execution to the same snapshot
+
+```sh
+dreamlake-eval discover --output suite.json --workflow workflow.json -- tests/
+pytest tests/ --eval-workflow workflow.json \
+  --eval-output reports/attempt-1 --eval-run-id regression \
+  --eval-job-id cpu --eval-attempt-id attempt-1
+```
+
+The generated suite contains `workflow`; the recorder carries that same object into `eval.json`, the initial `events.jsonl` event, and a separate `reports/attempt-1/workflow.json`. Pass the same snapshot at discovery and recording so a manifest can enforce the definition identity. `--eval-workflow` accepts a JSON snapshot, never raw YAML—even when the YAML file has been renamed `.json`.
+
+Recording is opt-in and existing reports without workflow provenance remain valid. The source revision, exact authored text and parsed definition participate in the suite's definition hash. Changing any of them requires a new inventory/manifest; it cannot silently become a retry of the old definition. A resumed attempt retains the same workflow. Replay retains the JSON snapshot without running its commands.
+
+For multiple jobs, manifests keep each job's explicit snapshot; `aggregate.json` exposes it at `jobs[].workflow`. Different jobs may have different provider definitions. No single shared workflow is inferred, and no association between a job, test and log is fabricated.
+
+## JSON envelope
+
+The envelope has these fields; hashes below are descriptions, not a runnable snapshot:
+
+| Field | Meaning |
+| --- | --- |
+| `schemaVersion` | `dreamlake.eval.workflow/v1` |
+| `kind` | `workflow` |
+| `provider` | Caller-supplied provider, for example `github` or `dreamlake` |
+| `source.format` | `yaml` or `json`, the authored format |
+| `source.path` / `source.revision` | Explicit source path and revision |
+| `source.content` | Exact authored UTF-8 text, for read-only inspection |
+| `source.sha256` | SHA-256 of the authored UTF-8 bytes |
+| `definition` | Parsed finite JSON object; expressions remain strings |
+| `definitionSha256` | SHA-256 of canonical JSON bytes of `definition` |
+
+The YAML parser uses safe YAML 1.2 semantics, preserving `on` as a string key. Duplicate keys, non-string object keys, custom tags, timestamp objects, non-finite numbers, multiple documents, aliases and directives are rejected. Expand aliases explicitly and quote date-like strings when needed. Source is limited to 1 MiB; normalized trees have depth and node limits. This is a bounded recording subset, not acceptance of every document a provider might accept.
+
+Validation reparses the authored content and checks the structured definition and both hashes. Merely editing a filename, digest or JSON field cannot bypass this boundary. Hashes detect consistency changes; they are not signatures or proof of source authorship. YAML-origin snapshots require the `workflow` extra for validation on readers and aggregators as well as writers. Native JSON snapshots need no optional parser dependency.
+
+## Python API
+
+```python
+from pathlib import Path
+from dreamlake_eval import workflow_snapshot, write_workflow, read_workflow
+
+snapshot = workflow_snapshot(
+    Path(".github/workflows/evaluation.yml").read_bytes().decode("utf-8"),
+    format="yaml", provider="github", revision="YOUR_COMMIT_SHA",
+    path=".github/workflows/evaluation.yml",
+)
+write_workflow("workflow.json", snapshot)
+assert read_workflow("workflow.json") == snapshot
+```
+
+`write_workflow` validates before an atomic JSON write. `read_workflow` parses JSON and validates the envelope and authored/structured consistency. Generic producers pass a validated snapshot as `suite["workflow"]` before constructing `Recorder`. Invalid snapshots fail before the attempt directory or journal is created. Individual snapshot files are atomic; the directory remains a collection of files, not a transaction. The committed event journal is authoritative if publishing a later file fails.

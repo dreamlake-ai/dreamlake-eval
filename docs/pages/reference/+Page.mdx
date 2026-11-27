@@ -18,6 +18,7 @@ The distribution is `dreamlake-eval`; the Python import is `dreamlake_eval`. The
 | `--eval-attempt-id ID` | Unique attempt identity; required for recording |
 | `--eval-attempt-number N` | Positive ordering number; defaults to 1 |
 | `--eval-suite-id ID` | Suite identity; defaults to `pytest` |
+| `--eval-workflow FILE` | Explicit validated workflow JSON snapshot; raw YAML is rejected |
 | `--eval-context JSON` | Explicit finite JSON object of attributes |
 | `--eval-discovery FILE` | Inventory output; requires `--collect-only` |
 | `--eval-resume-from FILE` | Prior report used to establish a new attempt's lineage |
@@ -70,3 +71,5 @@ The compatibility `cict.json` projection compresses some distinctions. Consult `
 The recorder is single-writer. Events have an increasing local sequence; snapshots are written atomically. A killed process can leave an incomplete report or truncated journal tail. Replay rejects a truncated tail unless explicitly requested with `dreamlake-eval replay events.jsonl --output recovered.json --allow-truncated-tail`; discarding that tail does not manufacture the missing event or a completion verdict.
 
 Each aggregate JSON file is atomic, but the collection of view files is not a multi-file transaction. Publish a finished output directory as an artifact snapshot when readers require a consistent view. Uploads, remote leases, distributed cancellation and scheduling are outside this local file contract.
+
+Workflow capture exports `workflow_snapshot`, `validate_workflow`, `read_workflow` and `write_workflow`. See [recorded workflow definitions](/workflows) for the JSON envelope, optional YAML adapter and recording guarantees.

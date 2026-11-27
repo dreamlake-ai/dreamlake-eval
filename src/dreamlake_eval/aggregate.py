@@ -97,6 +97,8 @@ def merge_reports(plan: dict, reports: list[dict]) -> dict:
                            "attemptId": report["attemptId"] if report else None,
                            "attemptNumber": report["attemptNumber"] if report else None,
                            "execution": report.get("execution") if report else "unknown"})
+        if "workflow" in job["suite"]:
+            job_states[-1]["workflow"] = deepcopy(job["suite"]["workflow"])
         for expected in job["suite"]["trials"]:
             trial = actual.get(expected["id"])
             attempt = trial["attempt"] if trial else None

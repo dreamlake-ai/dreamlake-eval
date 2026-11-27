@@ -1,6 +1,6 @@
 [project]
 name = "dreamlake-eval"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pytest discovery and explicit evaluation reports for long-running trials"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,8 @@ dependencies = []
 
 [project.optional-dependencies]
 pytest = ["pytest>=8.4,<10"]
-dev = ["pytest>=8.4,<10", "build>=1.2", "pytest-asyncio>=1,<2"]
+workflow = ["ruamel.yaml>=0.18.15,<0.20"]
+dev = ["ruamel.yaml>=0.18.15,<0.20", "pytest>=8.4,<10", "build>=1.2", "pytest-asyncio>=1,<2"]
 
 [project.scripts]
 dreamlake-eval = "dreamlake_eval.cli:main"

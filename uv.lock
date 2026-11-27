@@ -27,7 +27,7 @@ wheels = [
 
 [[package]]
 name = "dreamlake-eval"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 
 [package.optional-dependencies]
@@ -35,9 +35,13 @@ dev = [
     { name = "build" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "ruamel-yaml" },
 ]
 pytest = [
     { name = "pytest" },
+]
+workflow = [
+    { name = "ruamel-yaml" },
 ]
 
 [package.metadata]
@@ -46,8 +50,10 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4,<10" },
     { name = "pytest", marker = "extra == 'pytest'", specifier = ">=8.4,<10" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1,<2" },
+    { name = "ruamel-yaml", marker = "extra == 'dev'", specifier = ">=0.18.15,<0.20" },
+    { name = "ruamel-yaml", marker = "extra == 'workflow'", specifier = ">=0.18.15,<0.20" },
 ]
-provides-extras = ["pytest", "dev"]
+provides-extras = ["pytest", "workflow", "dev"]
 
 [[package]]
 name = "iniconfig"
@@ -121,6 +127,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2c/de/80724f9b5b9eca1a654179cae6edc51aaa0a355a9834a736e2a188b91780/pytest_asyncio-1.5.0.tar.gz", hash = "sha256:92c8fa83ca419fd0d4bd6a34df6520dae435841d3733c319343249492adf37f7", size = 146227, upload-time = "2026-11-12T16:35:49.845Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/27/2d/e600d8f47597a803641704aba367c7266cd621f86561ec36da9888f160ec/pytest_asyncio-1.5.0-py3-none-any.whl", hash = "sha256:557f255ee03cc84f84a8d5f438bc9c6e0f714bf86970ae743c7ecb5a38d7e07d", size = 17215, upload-time = "2026-11-12T16:35:48.446Z" },
+]
+
+[[package]]
+name = "ruamel-yaml"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
 ]
 
 [[package]]
