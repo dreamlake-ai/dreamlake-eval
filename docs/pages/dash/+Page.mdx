@@ -59,7 +59,12 @@ def test_quality(eval_trial, actual_dash_run_url):
     assert 0.95 >= 0.9
 ```
 
-`actual_dash_run_url` is a caller-provided fixture, not a built-in fixture. Open the intended existing run in DreamLake Dash and copy its canonical run address. The route is `https://dreamlake.ai/NAMESPACE/dash/PROJECT/RUN`; those uppercase values are placeholders, not a published destination. Remove any optional view-selection query or fragment. Use the exact run identity for this trial and attempt. A Source folder, pytest node ID, run name or local Dash prefix does not establish that identity.
+`actual_dash_run_url` is a caller-provided fixture, not a built-in fixture. Open the intended existing run in DreamLake Dash and copy its canonical run address. The route is shown below; its uppercase values are placeholders, not a published destination.
+
+```text
+https://dreamlake.ai/NAMESPACE/dash/PROJECT/RUN
+```
+ Remove any optional view-selection query or fragment. Use the exact run identity for this trial and attempt. A Source folder, pytest node ID, run name or local Dash prefix does not establish that identity.
 
 The current standalone Dash client does not expose a public canonical run-page URL property. Its remote recording banner may use the older project page with a run query; follow it, open the actual run in Dash, and copy the canonical Dash run address. Do not depend on the client's private `_view_url` or `_experiment_id` fields. Local-only `Experiment` output has no hosted destination unless it has separately been recorded or imported into a real run.
 
