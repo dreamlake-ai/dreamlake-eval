@@ -62,3 +62,5 @@ eval_trial.checkpoint("s3://my-bucket/run-17/checkpoint-100", name="step-100")
 ```
 
 The recorder does not upload the checkpoint, allocate a machine, poll a scheduler or restore a model. Cancellation, remote reconciliation and checkpoint restoration belong to the workload. See [long-running execution](/long-running) for retry and recovery boundaries.
+
+To associate an async trial with an existing Dash run, call `eval_trial.artifact(actual_dash_run_url, name="Dash run")` inside that trial or an explicit fixture. This does not change event-loop ownership or perform an upload. See the [per-test mapping example](/dash#async-tests-and-explicit-per-test-mappings).

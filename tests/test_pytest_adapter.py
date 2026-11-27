@@ -145,3 +145,28 @@ def test_source_provenance_is_explicit_and_backend_neutral(pytester):
     result = run(pytester, '--eval-source={"provider":"dreamlake","specVersion":"v1","workflowId":"simulation"}')
     assert result.ret == 0
     assert load(pytester)["source"] == {"provider": "dreamlake", "specVersion": "v1", "workflowId": "simulation"}
+
+
+def test_async_example_records_only_explicit_dash_association(tmp_path):
+    from dreamlake_eval import manifest, merge_reports
+    example = Path(__file__).resolve().parents[1] / "examples/multi_job"
+    # This URL is a local test fixture only; no remote calls or real run claim.
+    uri = "https://dreamlake.ai/example/dash/project/synthetic-async-run"
+    links = tmp_path / "links.json"
+    links.write_text(json.dumps({"test_async.py::test_async_trial": uri}))
+    args = ["test_async.py", "--dash-links", str(links)]
+    discovery = tmp_path / "suite.json"
+    collected = subprocess.run([sys.executable, "-m", "dreamlake_eval.cli", "discover", "--output", str(discovery), "--", *args], cwd=example, capture_output=True, text=True)
+    assert collected.returncode == 0, collected.stdout + collected.stderr
+    output = tmp_path / "attempt"
+    recorded = subprocess.run([sys.executable, "-m", "pytest", *args, "--eval-output", str(output), "--eval-run-id", "e", "--eval-attempt-id", "a"], cwd=example, capture_output=True, text=True)
+    assert recorded.returncode == 0, recorded.stdout + recorded.stderr
+    report = json.loads((output / "eval.json").read_text())
+    result = merge_reports(manifest("e", {"local": json.loads(discovery.read_text())}), [report])
+    assert result["complete"] and result["rows"][0]["attempt"]["artifacts"][0]["uri"] == uri
+
+    for invalid in ["https://external.invalid/example/dash/project/run", "https://dreamlake.ai/example/dash/project/run?view=logs", "https://dreamlake.ai/example/dash/project/%ZZ"]:
+        links.write_text(json.dumps({"test_async.py::test_async_trial": invalid}))
+        refused = subprocess.run([sys.executable, "-m", "pytest", *args, "--eval-output", str(tmp_path / "refused"), "--eval-run-id", "e", "--eval-attempt-id", "bad"], cwd=example, capture_output=True, text=True)
+        assert refused.returncode == 4 and "--dash-links must map" in refused.stderr
+        assert not (tmp_path / "refused").exists()
