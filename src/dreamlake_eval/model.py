@@ -308,6 +308,8 @@ class Recorder:
         return Trial(self, node_id)
 
     def finish(self, *, exit_code: int = 0, interrupted: bool = False) -> None:
+        if type(exit_code) is not int or type(interrupted) is not bool:
+            raise ValueError("exit_code must be an integer and interrupted a boolean")
         if self._data["execution"] != "running":
             raise ValueError("attempt already finished")
         for trial in list(self._data["trials"]):
@@ -347,7 +349,7 @@ class Trial:
         text(name); number(value)
         if step is not None and (type(step) is not int or step < 0):
             raise ValueError("step must be a nonnegative integer")
-        attrs = json_value(attributes or {})
+        attrs = json_value(attributes if attributes is not None else {})
         if not isinstance(attrs, dict):
             raise ValueError("attributes must be an object")
         trial = self._copy(running=True)
@@ -390,6 +392,8 @@ class Trial:
         if name not in {"setup", "call", "teardown"} or outcome not in {"passed", "failed", "skipped", "xfailed", "xpassed", "xpassed_strict"}:
             raise ValueError("invalid pytest phase")
         number(duration)
+        if duration < 0:
+            raise ValueError("duration cannot be negative")
         trial = self._copy(running=True)
         if name in trial["attempt"]["phases"]:
             raise ValueError("phase already recorded")
@@ -412,7 +416,10 @@ class Trial:
         nodes = trial["attempt"]["graph"]["nodes"]
         if any(n["id"] == node_id for n in nodes):
             raise ValueError("duplicate graph node")
-        nodes.append({"id": text(node_id), "kind": kind, "execution": "not_run", "attributes": json_value(attributes or {})})
+        attrs = json_value(attributes if attributes is not None else {})
+        if not isinstance(attrs, dict):
+            raise ValueError("attributes must be an object")
+        nodes.append({"id": text(node_id), "kind": kind, "execution": "not_run", "attributes": attrs})
         self._save("graph.node", trial)
 
     def edge(self, edge_id: str, source: str, target: str) -> None:

@@ -173,3 +173,35 @@ def test_snapshot_failure_preserves_replayable_committed_event(tmp_path, monkeyp
     with pytest.raises(OSError): recorder.trial(suite()["trials"][0]["id"]).start()
     assert replay(tmp_path / "attempt/events.jsonl")["trials"][0]["attempt"]["execution"] == "running"
     with pytest.raises(RuntimeError): recorder.finish()
+
+
+def test_cli_manifest_and_aggregate_use_explicit_files(tmp_path):
+    import subprocess
+    import sys
+    definition = tmp_path / "suite.json"
+    definition.write_text(json.dumps(suite()))
+    recorder = create(tmp_path / "attempt")
+    trial = recorder.trial(suite()["trials"][0]["id"]); trial.start(); trial.complete("completed", "passed"); recorder.finish()
+    command = [sys.executable, "-m", "dreamlake_eval.cli"]
+    subprocess.run(command + ["manifest", "--evaluation-id", "evaluation", "--job", f"local={definition}", "--output", str(tmp_path / "manifest.json")], check=True)
+    subprocess.run(command + ["aggregate", "--manifest", str(tmp_path / "manifest.json"), "--report", str(tmp_path / "attempt/eval.json"), "--output", str(tmp_path / "result"), "--metric", "reward"], check=True)
+    result = json.loads((tmp_path / "result/aggregate.json").read_text())
+    assert result["complete"] is True
+    config = json.loads((tmp_path / "result/.dreamrc").read_text())
+    assert config["version"] == 1 and config["views"][0]["view"] == "activityHeatmap"
+
+
+def test_invalid_manifest_and_attributes_rejected_before_write(tmp_path):
+    plan = manifest("evaluation", {"local": suite()})
+    plan["jobs"][0]["suite"]["trials"][0]["context"] = {"changed": True}
+    with pytest.raises(ValueError, match="manifest inventory"):
+        merge_reports(plan, [])
+    recorder = create(tmp_path / "attempt")
+    trial = recorder.trial(suite()["trials"][0]["id"]); trial.start()
+    before = recorder.snapshot()
+    with pytest.raises(ValueError): trial.node("bad", attributes=[])
+    with pytest.raises(ValueError): trial.metric("bad", 1, attributes=[])
+    with pytest.raises(ValueError): trial.checkpoint("file:///x", attributes=[])
+    with pytest.raises(ValueError): trial.phase("setup", "passed", duration=-1)
+    with pytest.raises(ValueError): recorder.finish(exit_code=True)
+    assert recorder.snapshot() == before

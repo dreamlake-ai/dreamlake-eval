@@ -32,6 +32,13 @@ def merge_reports(plan: dict, reports: list[dict]) -> dict:
     plan = json_value(plan)
     if not isinstance(plan, dict) or plan.get("schemaVersion") != SCHEMA_VERSION or plan.get("kind") != "manifest":
         raise ValueError("expected an evaluation manifest")
+    text(plan.get("evaluationId"))
+    if not isinstance(plan.get("jobs"), list):
+        raise ValueError("manifest requires jobs")
+    for job in plan["jobs"]:
+        text(job.get("jobId"))
+        if definition_hash(validate_suite(job.get("suite"))) != job.get("definitionHash"):
+            raise ValueError("manifest inventory does not match its definition hash")
     jobs = {job["jobId"]: job for job in plan["jobs"]}
     if len(jobs) != len(plan["jobs"]) or not jobs:
         raise ValueError("duplicate or empty job inventory")
