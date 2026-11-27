@@ -132,7 +132,7 @@ def write_aggregate(plan: dict, report_paths: list, output, *, metrics: list[str
         # Path identity is derived, never an untrusted metric name interpreted as a path.
         directory = "metric-" + hashlib.sha256(metric.encode()).hexdigest()[:16]
         data = {"schemaVersion": "dreamlake.cict/v1", "kind": "run", "runId": result["evaluationId"],
-                "name": metric, "records": deepcopy(records), "edges": []}
+                "suiteId": result["evaluationId"], "name": metric, "records": deepcopy(records), "edges": []}
         config = {"version": 1, "dataset": {"format": "cict", "file": "cict.json"}, "views": [{
                   "view": "activityHeatmap", "records": ["records"], "row": {"field": "attributes.jobId"},
                   "column": {"field": "testId"}, "value": "metrics.value", "status": "status"}]}
@@ -144,7 +144,7 @@ def write_aggregate(plan: dict, report_paths: list, output, *, metrics: list[str
         atomic_write(output / directory / ".dreamrc", config)
         views.append({"metric": metric, "directory": directory})
     atomic_write(output / "cict.json", {"schemaVersion": "dreamlake.cict/v1", "kind": "run",
-                 "runId": result["evaluationId"], "name": "Evaluation inventory", "records": records, "edges": []})
+                 "runId": result["evaluationId"], "suiteId": result["evaluationId"], "name": "Evaluation inventory", "records": records, "edges": []})
     atomic_write(output / ".dreamrc", {"version": 1, "dataset": {"format": "cict", "file": "cict.json"},
                  "views": [{"view": "activityHeatmap", "records": ["records"],
                             "row": {"field": "attributes.jobId"}, "column": {"field": "testId"}, "status": "status"}]})

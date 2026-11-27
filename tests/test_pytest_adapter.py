@@ -138,3 +138,10 @@ async def test_async(sample, eval_trial):
     report = load(pytester)
     assert report["trials"][0]["attempt"]["verdict"] == "passed"
     assert report["trials"][0]["attempt"]["metrics"]["reward"] == 0
+
+
+def test_source_provenance_is_explicit_and_backend_neutral(pytester):
+    pytester.makepyfile('def test_case(): pass')
+    result = run(pytester, '--eval-source={"provider":"dreamlake","specVersion":"v1","workflowId":"simulation"}')
+    assert result.ret == 0
+    assert load(pytester)["source"] == {"provider": "dreamlake", "specVersion": "v1", "workflowId": "simulation"}
